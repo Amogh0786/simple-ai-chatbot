@@ -70,9 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const badges = {
             builtin: 'Built-in Hybrid AI',
-            gemini: 'Cloud API',
-            openai: 'Cloud API',
-            ollama: 'Local Host'
+            gemini: 'Cloud API Connected',
+            openai: 'Cloud API Connected',
+            ollama: 'Local Host Connected'
         };
 
         currentModelDisplay.textContent = labels[currentSettings.provider] || 'Aether AI';
@@ -115,7 +115,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Format markdown-like text to clean HTML
     const renderMarkdown = (text) => {
-        // Escape basic HTML
         let escaped = text
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -222,8 +221,122 @@ if __name__ == "__main__":
             return `I am **Aether AI**, an intelligent conversational AI assistant built by **GANTA BALA AMOGH RAJ**! How can I assist you with your projects today?`;
         }
 
-        // Default General Intelligent Assistant Response
         return `I understand your request regarding **"${userMessage.trim()}"**.\n\nAs Aether AI (built by **GANTA BALA AMOGH RAJ**), I am ready to help you analyze this topic, write clean code, or explore technical architectures. Would you like me to generate a complete implementation plan or dive into specific code examples?`;
+    };
+
+    // Google Gemini REST API Caller
+    const callGeminiAPI = async (userMessage) => {
+        const apiKey = currentSettings.apiKey;
+        if (!apiKey) {
+            throw new Error("Missing Google Gemini API Key. Click 'API & Settings' to add your key.");
+        }
+
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        
+        const contents = conversationHistory.map(msg => ({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+        }));
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: {
+                    parts: [{ text: currentSettings.systemPrompt }]
+                },
+                contents: contents,
+                generationConfig: {
+                    temperature: currentSettings.temperature
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || response.statusText;
+            throw new Error(`Google Gemini API Error (${response.status}): ${errMsg}`);
+        }
+
+        const data = await response.json();
+        const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!outputText) {
+            throw new Error("Received empty response from Google Gemini API.");
+        }
+        return outputText;
+    };
+
+    // OpenAI REST API Caller
+    const callOpenAIAPI = async (userMessage) => {
+        const apiKey = currentSettings.apiKey;
+        if (!apiKey) {
+            throw new Error("Missing OpenAI API Key. Click 'API & Settings' to add your key.");
+        }
+
+        const endpoint = `https://api.openai.com/v1/chat/completions`;
+        const messages = [
+            { role: 'system', content: currentSettings.systemPrompt },
+            ...conversationHistory
+        ];
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: messages,
+                temperature: currentSettings.temperature
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || response.statusText;
+            throw new Error(`OpenAI API Error (${response.status}): ${errMsg}`);
+        }
+
+        const data = await response.json();
+        const outputText = data.choices?.[0]?.message?.content;
+        if (!outputText) {
+            throw new Error("Received empty response from OpenAI API.");
+        }
+        return outputText;
+    };
+
+    // Local Ollama REST API Caller
+    const callOllamaAPI = async (userMessage) => {
+        const endpoint = `http://localhost:11434/api/chat`;
+        const messages = [
+            { role: 'system', content: currentSettings.systemPrompt },
+            ...conversationHistory
+        ];
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'llama3',
+                messages: messages,
+                stream: false,
+                options: {
+                    temperature: currentSettings.temperature
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ollama Error (${response.status}): Make sure Ollama is running locally on port 11434.`);
+        }
+
+        const data = await response.json();
+        const outputText = data.message?.content;
+        if (!outputText) {
+            throw new Error("Received empty response from local Ollama engine.");
+        }
+        return outputText;
     };
 
     // Handle Form Submit
@@ -249,13 +362,20 @@ if __name__ == "__main__":
             let aiResponse = '';
             if (currentSettings.provider === 'builtin') {
                 aiResponse = await getBuiltinAIResponse(text);
-            } else {
-                // Fallback to built-in if API key is missing
-                if (!currentSettings.apiKey && currentSettings.provider !== 'ollama') {
-                    aiResponse = `> **Note:** No API Key configured for **${currentSettings.provider.toUpperCase()}**. Automatically falling back to Aether Built-in Hybrid Engine.\n\n` + await getBuiltinAIResponse(text);
+            } else if (currentSettings.provider === 'gemini') {
+                if (!currentSettings.apiKey) {
+                    aiResponse = `> ⚠️ **No Gemini API Key Configured!**\n> To use Google Gemini Pro, click on **API & Settings** in the bottom-left sidebar, select **Google Gemini API**, and paste your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey).\n> \n> *Automatically falling back to Aether Built-in Engine:*\n\n` + await getBuiltinAIResponse(text);
                 } else {
-                    aiResponse = await getBuiltinAIResponse(text);
+                    aiResponse = await callGeminiAPI(text);
                 }
+            } else if (currentSettings.provider === 'openai') {
+                if (!currentSettings.apiKey) {
+                    aiResponse = `> ⚠️ **No OpenAI API Key Configured!**\n> To use OpenAI GPT-4o, click on **API & Settings** in the bottom-left sidebar, select **OpenAI (GPT-4o)**, and paste your API key from [OpenAI Platform](https://platform.openai.com/api-keys).\n> \n> *Automatically falling back to Aether Built-in Engine:*\n\n` + await getBuiltinAIResponse(text);
+                } else {
+                    aiResponse = await callOpenAIAPI(text);
+                }
+            } else if (currentSettings.provider === 'ollama') {
+                aiResponse = await callOllamaAPI(text);
             }
 
             typingIndicator.classList.add('hidden');
@@ -264,7 +384,7 @@ if __name__ == "__main__":
 
         } catch (error) {
             typingIndicator.classList.add('hidden');
-            appendMessage('assistant', `**Error:** Unable to synthesize response. ${error.message}`);
+            appendMessage('assistant', `**Error:** ${error.message}\n\n*Tip: You can switch back to the **Aether Built-in Hybrid Engine** in **API & Settings** anytime for zero-config offline responses.*`);
         }
     });
 
