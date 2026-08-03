@@ -224,46 +224,62 @@ if __name__ == "__main__":
         return `I understand your request regarding **"${userMessage.trim()}"**.\n\nAs Aether AI (built by **GANTA BALA AMOGH RAJ**), I am ready to help you analyze this topic, write clean code, or explore technical architectures. Would you like me to generate a complete implementation plan or dive into specific code examples?`;
     };
 
-    // Google Gemini REST API Caller
+    // Google Gemini REST API Caller with Automatic Model Fallback
     const callGeminiAPI = async (userMessage) => {
         const apiKey = currentSettings.apiKey;
         if (!apiKey) {
             throw new Error("Missing Google Gemini API Key. Click 'API & Settings' to add your key.");
         }
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const modelsToTry = [
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro-latest',
+            'gemini-1.5-flash-001',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro',
+            'gemini-pro'
+        ];
         
         const contents = conversationHistory.map(msg => ({
             role: msg.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: msg.content }]
         }));
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: {
-                    parts: [{ text: currentSettings.systemPrompt }]
-                },
-                contents: contents,
-                generationConfig: {
-                    temperature: currentSettings.temperature
+        let lastError = null;
+        for (const modelName of modelsToTry) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: {
+                            parts: [{ text: currentSettings.systemPrompt }]
+                        },
+                        contents: contents,
+                        generationConfig: {
+                            temperature: currentSettings.temperature
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || response.statusText;
+                    lastError = new Error(`Google Gemini (${modelName}): ${errMsg}`);
+                    continue;
                 }
-            })
-        });
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || response.statusText;
-            throw new Error(`Google Gemini API Error (${response.status}): ${errMsg}`);
+                const data = await response.json();
+                const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (outputText) {
+                    return outputText;
+                }
+            } catch (err) {
+                lastError = err;
+            }
         }
-
-        const data = await response.json();
-        const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!outputText) {
-            throw new Error("Received empty response from Google Gemini API.");
-        }
-        return outputText;
+        throw lastError || new Error("Failed to connect to Google Gemini API models.");
     };
 
     // OpenAI REST API Caller
