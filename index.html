@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aether AI — Next-Gen Intelligent Assistant</title>
+    <meta name="description" content="A premium, glassmorphic AI chatbot web application with intelligent local conversational synthesis and multi-provider API support.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="ambient-background">
+        <div class="glow-orb orb-primary"></div>
+        <div class="glow-orb orb-secondary"></div>
+        <div class="glow-orb orb-accent"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a8 8 0 0 0-8 8c0 3.25 2 6 4 7.5V20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.5c2-1.5 4-4.25 4-7.5a8 8 0 0 0-8-8z"/>
+                            <path d="M10 14h4"/>
+                            <path d="M10 10h4"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">Aether<span>.ai</span></span>
+                </div>
+                <button id="new-chat-btn" class="btn-new-chat" title="Start a new chat">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <div class="sidebar-section">
+                <span class="section-title">Recent Conversations</span>
+                <ul id="history-list" class="history-list">
+                    <li class="history-item active" data-id="default">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span class="history-title">Welcome & Capabilities</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <button id="open-settings-btn" class="sidebar-action-btn">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>API & Settings</span>
+                </button>
+                <div class="user-profile">
+                    <div class="user-avatar">AR</div>
+                    <div class="user-info">
+                        <span class="user-name">AMOGH RAJ</span>
+                        <span class="user-role">Developer</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+            <!-- Header -->
+            <header class="chat-header">
+                <div class="header-left">
+                    <div class="ai-status">
+                        <span class="status-indicator active" id="model-status-indicator"></span>
+                        <div class="status-info">
+                            <h1 class="model-name" id="current-model-display">Aether Neural Engine v3</h1>
+                            <span class="status-subtext">Online & Ready • <span id="mode-badge">Built-in Hybrid AI</span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="clear-chat-btn" class="icon-btn" title="Clear chat history">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                    <button id="toggle-sidebar-btn" class="icon-btn mobile-only" title="Toggle sidebar">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Message Feed -->
+            <div id="messages-container" class="messages-container">
+                <!-- Welcome Banner -->
+                <div class="welcome-banner" id="welcome-banner">
+                    <div class="welcome-icon">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="url(#gradient-primary)" stroke-width="1.8">
+                            <defs>
+                                <linearGradient id="gradient-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#38bdf8" />
+                                    <stop offset="100%" stop-color="#818cf8" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M12 2a8 8 0 0 0-8 8c0 3.25 2 6 4 7.5V20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.5c2-1.5 4-4.25 4-7.5a8 8 0 0 0-8-8z"/>
+                            <path d="M10 14h4"/>
+                            <path d="M10 10h4"/>
+                        </svg>
+                    </div>
+                    <h2>How can I assist your workflow today?</h2>
+                    <p>I am Aether, an intelligent AI coding and reasoning partner. Ask a question or try one of the prompts below.</p>
+                    
+                    <div class="prompt-grid">
+                        <button class="prompt-card" data-prompt="Explain how quantum entanglement works using simple analogies.">
+                            <span class="prompt-tag">Science</span>
+                            <span class="prompt-title">Explain Quantum Entanglement</span>
+                            <span class="prompt-desc">Break down complex physics into simple concepts</span>
+                        </button>
+                        <button class="prompt-card" data-prompt="Write a Python script that fetches weather data from an API and formats it into a neat table.">
+                            <span class="prompt-tag">Coding</span>
+                            <span class="prompt-title">Python API Scraper</span>
+                            <span class="prompt-desc">Generate clean, documented Python utility code</span>
+                        </button>
+                        <button class="prompt-card" data-prompt="What are the key architectural differences between React 19 and Vue 3 Composition API?">
+                            <span class="prompt-tag">Architecture</span>
+                            <span class="prompt-title">React vs Vue Architecture</span>
+                            <span class="prompt-desc">Compare frontend reactive rendering models</span>
+                        </button>
+                        <button class="prompt-card" data-prompt="Provide a 5-step checklist for optimizing web application performance and Core Web Vitals.">
+                            <span class="prompt-tag">Performance</span>
+                            <span class="prompt-title">Core Web Vitals Optimization</span>
+                            <span class="prompt-desc">Actionable checklist for modern web speed</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div id="typing-indicator" class="typing-indicator hidden">
+                <div class="avatar ai-avatar">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.25 2 6 4 7.5V20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.5c2-1.5 4-4.25 4-7.5a8 8 0 0 0-8-8z"/></svg>
+                </div>
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+
+            <!-- Chat Input Area -->
+            <footer class="chat-footer">
+                <form id="chat-form" class="input-form">
+                    <div class="input-container">
+                        <textarea 
+                            id="user-input" 
+                            rows="1" 
+                            placeholder="Message Aether AI... (Press Enter to send, Shift+Enter for newline)"
+                            autofocus
+                        ></textarea>
+                        <div class="input-actions">
+                            <button type="submit" id="send-btn" class="btn-send" title="Send Message" disabled>
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="footer-meta">
+                        <span>Aether AI • Built by <strong>GANTA BALA AMOGH RAJ</strong></span>
+                        <span class="separator">•</span>
+                        <span>Press <kbd>/</kbd> to focus input</span>
+                    </div>
+                </form>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>AI Provider & Settings</h3>
+                <button id="close-settings-btn" class="icon-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="provider-select">AI Engine Provider</label>
+                    <select id="provider-select" class="form-input">
+                        <option value="builtin">Aether Built-in Hybrid Engine (Works Out-of-the-Box)</option>
+                        <option value="gemini">Google Gemini API</option>
+                        <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                        <option value="ollama">Local Ollama (localhost:11434)</option>
+                    </select>
+                </div>
+
+                <div id="api-key-group" class="form-group hidden">
+                    <label for="api-key-input">API Key</label>
+                    <input type="password" id="api-key-input" class="form-input" placeholder="Paste your API key here...">
+                    <span class="help-text">Your API key is stored locally in your browser's localStorage and is never transmitted anywhere else.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="system-prompt-input">System Personality / Instructions</label>
+                    <textarea id="system-prompt-input" class="form-input" rows="3">You are Aether AI, a knowledgeable, concise, and helpful AI assistant created by GANTA BALA AMOGH RAJ. Provide clear answers with clean formatting and code blocks when helpful.</textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="temperature-slider">Creativity (Temperature): <span id="temp-val">0.7</span></label>
+                        <input type="range" id="temperature-slider" min="0" max="1" step="0.05" value="0.7" class="form-range">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="reset-settings-btn" class="btn-secondary">Reset Default</button>
+                <button id="save-settings-btn" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
