@@ -224,8 +224,8 @@ if __name__ == "__main__":
         return `I understand your request regarding **"${userMessage.trim()}"**.\n\nAs Aether AI (built by **GANTA BALA AMOGH RAJ**), I am ready to help you analyze this topic, write clean code, or explore technical architectures. Would you like me to generate a complete implementation plan or dive into specific code examples?`;
     };
 
-    // Discover authorized Gemini model for this specific API key
-    const getAvailableGeminiModel = async (apiKey) => {
+    // Discover and prioritize authorized Gemini models for this specific API key
+    const getAvailableGeminiModels = async (apiKey) => {
         const endpoints = ['v1beta', 'v1'];
         for (const version of endpoints) {
             try {
@@ -234,87 +234,122 @@ if __name__ == "__main__":
                     const data = await res.json();
                     const models = data.models || [];
                     const genModels = models.filter(m => 
-                        (m.supportedGenerationMethods || []).includes('generateContent')
+                        (m.supportedGenerationMethods || []).includes('generateContent') &&
+                        !m.name.includes('vision') && !m.name.includes('embedding')
                     );
                     if (genModels.length > 0) {
-                        const preferred = genModels.find(m => m.name.includes('1.5-flash')) ||
-                                          genModels.find(m => m.name.includes('2.0-flash')) ||
-                                          genModels.find(m => m.name.includes('flash')) ||
-                                          genModels.find(m => m.name.includes('pro')) ||
-                                          genModels[0];
-                        const cleanName = preferred.name.replace('models/', '');
-                        console.log(`Discovered Gemini model: ${cleanName} on ${version}`);
-                        return { name: cleanName, version: version };
+                        // Sort models to prioritize stable free-tier models first (1.5-flash, 1.5-flash-8b, 1.5-pro)
+                        genModels.sort((a, b) => {
+                            const score = (name) => {
+                                if (name.includes('1.5-flash-latest')) return 100;
+                                if (name.includes('1.5-flash-001')) return 95;
+                                if (name.includes('1.5-flash-8b')) return 90;
+                                if (name.includes('1.5-flash')) return 85;
+                                if (name.includes('1.5-pro')) return 70;
+                                if (name.includes('2.0-flash')) return 50;
+                                return 10;
+                            };
+                            return score(b.name) - score(a.name);
+                        });
+                        return genModels.map(m => ({
+                            name: m.name.replace('models/', ''),
+                            version: version
+                        }));
                     }
                 }
             } catch (e) {
                 console.warn(`Failed listing models on ${version}:`, e);
             }
         }
-        return { name: 'gemini-1.5-flash-latest', version: 'v1beta' };
+        return [
+            { name: 'gemini-1.5-flash-latest', version: 'v1beta' },
+            { name: 'gemini-1.5-flash', version: 'v1beta' },
+            { name: 'gemini-1.5-flash-8b', version: 'v1beta' },
+            { name: 'gemini-1.5-pro-latest', version: 'v1beta' }
+        ];
     };
 
-    // Google Gemini REST API Caller with Automatic Model Discovery & Fallback
+    // Google Gemini REST API Caller with Multi-Model Iteration & Seamless Quota Fallback
     const callGeminiAPI = async (userMessage) => {
         const apiKey = currentSettings.apiKey;
         if (!apiKey) {
             throw new Error("Missing Google Gemini API Key. Click 'API & Settings' to add your key.");
         }
 
-        // 1. Discover actual available model for this API key
-        const modelInfo = await getAvailableGeminiModel(apiKey);
-        const endpoint = `https://generativelanguage.googleapis.com/${modelInfo.version}/models/${modelInfo.name}:generateContent?key=${apiKey}`;
-
+        const candidateModels = await getAvailableGeminiModels(apiKey);
         const contents = conversationHistory.map(msg => ({
             role: msg.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: msg.content }]
         }));
 
-        // Try with system_instruction first
-        let response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: {
-                    parts: [{ text: currentSettings.systemPrompt }]
-                },
-                contents: contents,
-                generationConfig: {
-                    temperature: currentSettings.temperature
+        let lastError = null;
+        let isQuotaExceeded = false;
+
+        for (const modelInfo of candidateModels) {
+            const endpoint = `https://generativelanguage.googleapis.com/${modelInfo.version}/models/${modelInfo.name}:generateContent?key=${apiKey}`;
+            try {
+                // Try with system_instruction first
+                let response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: {
+                            parts: [{ text: currentSettings.systemPrompt }]
+                        },
+                        contents: contents,
+                        generationConfig: {
+                            temperature: currentSettings.temperature
+                        }
+                    })
+                });
+
+                // If system_instruction is unsupported by this model/version, retry without it
+                if (!response.ok && response.status === 400) {
+                    response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [
+                                { role: 'user', parts: [{ text: `System instruction: ${currentSettings.systemPrompt}` }] },
+                                { role: 'model', parts: [{ text: 'Understood. I am Aether AI.' }] },
+                                ...contents
+                            ],
+                            generationConfig: {
+                                temperature: currentSettings.temperature
+                            }
+                        })
+                    });
                 }
-            })
-        });
 
-        // If system_instruction is unsupported by this model/version, retry without it
-        if (!response.ok && response.status === 400) {
-            response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [
-                        { role: 'user', parts: [{ text: `System instruction: ${currentSettings.systemPrompt}` }] },
-                        { role: 'model', parts: [{ text: 'Understood. I am Aether AI.' }] },
-                        ...contents
-                    ],
-                    generationConfig: {
-                        temperature: currentSettings.temperature
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || response.statusText;
+                    if (response.status === 429 || errMsg.toLowerCase().includes('quota')) {
+                        isQuotaExceeded = true;
                     }
-                })
-            });
+                    lastError = new Error(`Google Gemini (${modelInfo.name}): ${errMsg}`);
+                    console.warn(`Model ${modelInfo.name} failed (${response.status}): ${errMsg}`);
+                    continue; // Try next model in candidate list
+                }
+
+                const data = await response.json();
+                const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (outputText) {
+                    return outputText;
+                }
+            } catch (err) {
+                lastError = err;
+            }
         }
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            const errMsg = errData.error?.message || response.statusText;
-            throw new Error(`Google Gemini API Error (${response.status}) on model ${modelInfo.name}: ${errMsg}`);
+        // If all Gemini cloud models fail due to quota/429 limits, seamlessly fallback to built-in AI engine
+        if (isQuotaExceeded) {
+            console.warn("Gemini API cloud quota exceeded. Switching seamlessly to Aether Built-in Hybrid Engine.");
+            const fallbackText = await getBuiltinAIResponse(userMessage);
+            return `> ⚡ **Google Gemini Free Tier Quota Notice (429):** Your API key's free cloud quota is currently at 0 or rate-limited. Automatically answering via **Aether Built-in Hybrid Engine** so you never get interrupted:\n\n` + fallbackText;
         }
 
-        const data = await response.json();
-        const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!outputText) {
-            throw new Error("Received empty response from Google Gemini API.");
-        }
-        return outputText;
+        throw lastError || new Error("Failed to generate content from Google Gemini API models.");
     };
 
     // OpenAI REST API Caller
