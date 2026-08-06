@@ -1,4 +1,4 @@
-# Aether AI — Next-Gen Intelligent Assistant
+# Mercy AI — Next-Gen Intelligent Assistant
 
 A sleek, premium, glassmorphic AI Chatbot web application designed with modern aesthetics, intelligent local conversational synthesis, and seamless multi-provider API integration.
 
